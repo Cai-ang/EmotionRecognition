@@ -31,6 +31,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReadyPlayerMe.Extras.Editor
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pico.Spatializer.Editor", "Pico.Spatializer.Editor.csproj", "{B6A48383-34DE-B7DE-0B7D-F5DD6747C071}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.XR.PICO.LivePreview", "Unity.XR.PICO.LivePreview.csproj", "{0080F1A0-62B2-3A3D-E3D1-29E75743F02D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.XR.PICO.LivePreview.Editor", "Unity.XR.PICO.LivePreview.Editor.csproj", "{E941D87D-1C25-2789-E0E4-E6F33C7B487C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -97,6 +101,14 @@ Global
 		{B6A48383-34DE-B7DE-0B7D-F5DD6747C071}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B6A48383-34DE-B7DE-0B7D-F5DD6747C071}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B6A48383-34DE-B7DE-0B7D-F5DD6747C071}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0080F1A0-62B2-3A3D-E3D1-29E75743F02D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0080F1A0-62B2-3A3D-E3D1-29E75743F02D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0080F1A0-62B2-3A3D-E3D1-29E75743F02D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0080F1A0-62B2-3A3D-E3D1-29E75743F02D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E941D87D-1C25-2789-E0E4-E6F33C7B487C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E941D87D-1C25-2789-E0E4-E6F33C7B487C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E941D87D-1C25-2789-E0E4-E6F33C7B487C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E941D87D-1C25-2789-E0E4-E6F33C7B487C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

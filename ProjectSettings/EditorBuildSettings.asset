@@ -9,6 +9,7 @@ EditorBuildSettings:
     path: Assets/FTDemo.unity
     guid: c44f9c704b8979a46b405012729fa60e
   m_configObjects:
+    Unity.XR.PICO.LivePreview.Settings: {fileID: 11400000, guid: 07d475337cd7ec14597a6f7a7c4719e9, type: 2}
     Unity.XR.PXR.Settings: {fileID: 11400000, guid: 2e0d1c8949dd23a458b454ecaead6f31, type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: c1b1a00ccbf86514fbc2ce713b30f0bb, type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 0fbcaea342e3ee8468b816c6c0b3309b, type: 2}

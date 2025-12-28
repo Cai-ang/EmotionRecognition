@@ -62,6 +62,15 @@
       "dependencies": {},
       "url": "https://packages.unity.cn"
     },
+    "com.unity.pico.livepreview": {
+      "version": "file:C:/Users/lenovo/Downloads/Unity Live Preview Plugin-1.0.5-20250211",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.unity.xr.management": "4.0.0",
+        "com.unity.xr.interaction.toolkit": "2.0.0"
+      }
+    },
     "com.unity.test-framework": {
       "version": "1.1.33",
       "depth": 0,

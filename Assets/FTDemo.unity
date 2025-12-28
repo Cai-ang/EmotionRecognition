@@ -1753,7 +1753,7 @@ MonoBehaviour:
   minEyeTextureScale: 0.7
   maxEyeTextureScale: 1.26
   enableSuperResolution: 0
-  useRecommendedAntiAliasingLevel: 0
+  useRecommendedAntiAliasingLevel: 1
 --- !u!114 &730234157
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3890,6 +3890,10 @@ GameObject:
   m_Component:
   - component: {fileID: 1293844808}
   - component: {fileID: 1293844807}
+  - component: {fileID: 1293844812}
+  - component: {fileID: 1293844811}
+  - component: {fileID: 1293844810}
+  - component: {fileID: 1293844809}
   m_Layer: 0
   m_Name: FTManager
   m_TagString: Untagged
@@ -3915,6 +3919,9 @@ MonoBehaviour:
   rightEyeExample: {fileID: 4020631}
   text: {fileID: 3258674095736777724, guid: 92eea88ffa1fa4f11b24215978aae16f, type: 3}
   TextParent: {fileID: 1352550713}
+  EmotionUIParent: {fileID: 0}
+  emotionRecognizer: {fileID: 0}
+  emotionFeedback: {fileID: 0}
 --- !u!4 &1293844808
 Transform:
   m_ObjectHideFlags: 0
@@ -3930,6 +3937,113 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1293844809
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1293844806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04fddc224bfbb5349a601c158dfb0179, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  confidenceThreshold: 0.7
+  expressionHoldTime: 1.5
+  smoothingFrames: 5
+  showDebugInfo: 1
+--- !u!114 &1293844810
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1293844806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c555fd53a7caf64e9440da62d440556, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  historySize: 100
+  analysisInterval: 5
+  showEmotionGraph: 1
+  showEmotionStats: 1
+  graphContainer: {fileID: 0}
+  emotionBarPrefab: {fileID: 0}
+  showDebugInfo: 1
+--- !u!114 &1293844811
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1293844806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66d3f1ce1196f9e4c9e3fc53ee774025, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  emotionText: {fileID: 0}
+  confidenceSlider: {fileID: 0}
+  emotionIcon: {fileID: 0}
+  backgroundPanel: {fileID: 0}
+  neutralIcon: {fileID: 0}
+  happyIcon: {fileID: 0}
+  sadIcon: {fileID: 0}
+  angryIcon: {fileID: 0}
+  surprisedIcon: {fileID: 0}
+  fearIcon: {fileID: 0}
+  disgustedIcon: {fileID: 0}
+  confusedIcon: {fileID: 0}
+  neutralColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  happyColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  sadColor: {r: 0, g: 0, b: 1, a: 1}
+  angryColor: {r: 1, g: 0, b: 0, a: 1}
+  surprisedColor: {r: 1, g: 0, b: 1, a: 1}
+  fearColor: {r: 0, g: 0, b: 0, a: 1}
+  disgustedColor: {r: 0, g: 1, b: 0, a: 1}
+  confusedColor: {r: 0.7, g: 0.5, b: 0, a: 1}
+  audioSource: {fileID: 0}
+  happySound: {fileID: 0}
+  sadSound: {fileID: 0}
+  angrySound: {fileID: 0}
+  surprisedSound: {fileID: 0}
+  fearSound: {fileID: 0}
+  disgustedSound: {fileID: 0}
+  confusedSound: {fileID: 0}
+  happyParticles: {fileID: 0}
+  sadParticles: {fileID: 0}
+  angryParticles: {fileID: 0}
+  surprisedParticles: {fileID: 0}
+  fearParticles: {fileID: 0}
+  disgustedParticles: {fileID: 0}
+  confusedParticles: {fileID: 0}
+  useAudioFeedback: 1
+  useVisualFeedback: 1
+  useColorFeedback: 1
+  useHapticFeedback: 0
+  feedbackCooldown: 1
+--- !u!114 &1293844812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1293844806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f11c4fd21aff96a43aec2f774f678b12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  recordOnStart: 0
+  recordEmotions: 1
+  recordBlendShapes: 1
+  recordingInterval: 0.1
+  fileName: EmotionData
+  fileExtension: .csv
+  includeTimestamp: 1
+  showDebugInfo: 1
 --- !u!1 &1315293156
 GameObject:
   m_ObjectHideFlags: 0

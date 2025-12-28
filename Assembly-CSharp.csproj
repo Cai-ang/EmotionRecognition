@@ -63,6 +63,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\FTTest.cs" />
+    <Compile Include="Assets\MicroExpressionRecognizer.cs" />
+    <Compile Include="Assets\EmotionHistoryAnalyzer.cs" />
+    <Compile Include="Assets\EmotionDataRecorder.cs" />
+    <Compile Include="Assets\EmotionFeedbackSystem.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />
@@ -1072,6 +1076,8 @@
     <ProjectReference Include="PICO.Platform.csproj" />
     <ProjectReference Include="Pico.Spatializer.Example.csproj" />
     <ProjectReference Include="Unity.XR.PICO.Editor.csproj" />
+    <ProjectReference Include="Unity.XR.PICO.LivePreview.csproj" />
+    <ProjectReference Include="Unity.XR.PICO.LivePreview.Editor.csproj" />
   </ItemGroup>
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
   <ItemGroup>

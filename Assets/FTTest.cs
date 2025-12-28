@@ -6,13 +6,20 @@ using TMPro;
 
 public class FTTest : MonoBehaviour
 {
+    [Header("面部渲染器")]
     public SkinnedMeshRenderer skin;
     public SkinnedMeshRenderer tongueBlendShape;
     public SkinnedMeshRenderer leftEyeExample;
     public SkinnedMeshRenderer rightEyeExample;
 
+    [Header("UI元素")]
     public GameObject text;
     public Transform TextParent;
+    public Transform EmotionUIParent; // 情绪UI的父对象
+
+    [Header("表情识别")]
+    public MicroExpressionRecognizer emotionRecognizer;
+    public EmotionFeedbackSystem emotionFeedback;
 
     private List<TMP_Text> texts = new List<TMP_Text>();
 
@@ -110,17 +117,32 @@ public class FTTest : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        // ��ʼ�沿׷��
+        Debug.Log("FTTest: Initializing face tracking...");
+        
+        // 检查设备能力
+        if (!PXR_Plugin.System.UPxr_QueryDeviceAbilities(PxrDeviceAbilities.PxrTrackingModeFaceBit))
+        {
+            Debug.LogError("FTTest: Device does not support face tracking!");
+            return;
+        }
+        Debug.Log("FTTest: Device supports face tracking");
+        
+        // 开始面部追踪
         PXR_MotionTracking.WantFaceTrackingService();
         FaceTrackingStartInfo info = new FaceTrackingStartInfo();
         info.mode = FaceTrackingMode.PXR_FTM_FACE_LIPS_BS;
         PXR_MotionTracking.StartFaceTracking(ref info);
+        Debug.Log("FTTest: Face tracking started with mode: " + info.mode);
 
+        // 初始化BlendShape索引
         for (int i = 0; i < indexList.Length; i++)
         {
             indexList[i] = skin.sharedMesh.GetBlendShapeIndex(blendShapeList[i]);
-            GameObject textGO = GameObject.Instantiate(text,TextParent);
-            texts.Add(textGO.GetComponent<TMP_Text>());
+            if (TextParent != null) // 只有在有TextParent的情况下创建调试文本
+            {
+                GameObject textGO = GameObject.Instantiate(text, TextParent);
+                texts.Add(textGO.GetComponent<TMP_Text>());
+            }
         }
 
         
@@ -133,7 +155,38 @@ public class FTTest : MonoBehaviour
         rightLookUpIndex = rightEyeExample.sharedMesh.GetBlendShapeIndex("eyeLookUpRight");
         rightLookInIndex = rightEyeExample.sharedMesh.GetBlendShapeIndex("eyeLookInRight");
         rightLookOutIndex = rightEyeExample.sharedMesh.GetBlendShapeIndex("eyeLookOutRight");
+        
+        // 初始化表情识别和反馈系统
+        InitializeEmotionSystems();
 
+    }
+    
+    // 初始化表情识别和反馈系统
+    private void InitializeEmotionSystems()
+    {
+        // 如果没有指定表情识别器，尝试获取
+        if (emotionRecognizer == null)
+        {
+            emotionRecognizer = GetComponent<MicroExpressionRecognizer>();
+            if (emotionRecognizer == null)
+            {
+                Debug.LogWarning("FTTest: 未找到MicroExpressionRecognizer组件，已添加");
+                emotionRecognizer = gameObject.AddComponent<MicroExpressionRecognizer>();
+            }
+        }
+        
+        // 如果没有指定情绪反馈系统，尝试获取
+        if (emotionFeedback == null)
+        {
+            emotionFeedback = GetComponent<EmotionFeedbackSystem>();
+            if (emotionFeedback == null)
+            {
+                Debug.LogWarning("FTTest: 未找到EmotionFeedbackSystem组件，已添加");
+                emotionFeedback = gameObject.AddComponent<EmotionFeedbackSystem>();
+            }
+        }
+        
+        Debug.Log("FTTest: 表情识别和反馈系统已初始化");
     }
 
     // Update is called once per frame
@@ -190,12 +243,36 @@ public class FTTest : MonoBehaviour
             rightEyeExample.SetBlendShapeWeight(rightLookInIndex, 100 * blendShapeWeight[11]);
             rightEyeExample.SetBlendShapeWeight(rightLookOutIndex, 100 * blendShapeWeight[45]);
             
+            // 处理表情识别数据
+            if (emotionRecognizer != null)
+            {
+                emotionRecognizer.ProcessFaceTrackingData(blendShapeWeight, blendShapeList);
+            }
+        }
+        else
+        {
+            if (Time.frameCount % 60 == 0) // 每60帧打印一次，避免日志过多
+            {
+                Debug.LogWarning("FTTest: Face tracking not available or not started!");
+            }
         }
     }
 
     public void ToggleDebugUI()
     {
         TextParent.gameObject.SetActive(!TextParent.gameObject.activeSelf);
+    }
+    
+    // 获取当前blendShape权重（用于其他组件访问）
+    public float[] GetCurrentBlendShapeWeights()
+    {
+        return (float[])blendShapeWeight.Clone();
+    }
+    
+    // 获取blendShape名称列表
+    public List<string> GetBlendShapeNames()
+    {
+        return blendShapeList;
     }
 }
 
