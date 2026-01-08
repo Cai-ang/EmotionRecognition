@@ -1,403 +1,312 @@
 using System.Collections.Generic;
-using UnityEngine;
 using System.IO;
-using System;
-using System.Globalization;
-using System.Linq;
+using Unity.XR.PXR;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
-// 表情数据记录器
 public class EmotionDataRecorder : MonoBehaviour
 {
-    [Header("记录设置")]
-    public bool recordOnStart = false;
-    public bool recordEmotions = true;
-    public bool recordBlendShapes = true;
-    public float recordingInterval = 0.1f; // 记录间隔（秒）
-    
-    [Header("文件设置")]
-    public string fileName = "EmotionData";
-    public string fileExtension = ".csv";
-    public bool includeTimestamp = true;
-    
-    [Header("调试")]
-    public bool showDebugInfo = true;
-    
-    // 内部变量
+    [Header("UI References")]
+    public Button recordButton;
+    public TMP_Text recordTimeText;
+    public TMP_Text statusText;
+
+    [Header("Recording Settings")]
+    public float recordDuration = 10f; // 记录时长（秒）
+    public int sampleRate = 30; // 采样频率（Hz，每秒采样次数）
+    public string emotionLabel = "neutral"; // 当前表情标签（手动设置）
+
+    // 面部追踪数据
+    private PxrFaceTrackingInfo faceTrackingInfo;
+    private float[] blendShapeWeight = new float[72];
+
+    // 记录状态
     private bool isRecording = false;
-    private float lastRecordingTime = 0f;
-    private MicroExpressionRecognizer emotionRecognizer;
-    private List<string> blendShapeNames;
-    private StreamWriter writer;
-    private string filePath;
-    
-    // 记录的数据
-    public struct EmotionRecord
+    private float recordTimer = 0f;
+    private float sampleTimer = 0f;
+    private List<EmotionData> recordedData = new List<EmotionData>();
+
+    // 数据保存路径
+    private string savePath;
+
+    [System.Serializable]
+    private class EmotionData
     {
-        public float timestamp;
-        public EmotionType emotion;
-        public float confidence;
-        public float[] blendShapeWeights;
+        public float timestamp; // 时间戳（相对于记录开始的时间，秒）
+        public float[] blendShapeWeights = new float[72]; // 72个blendShape权重值
     }
-    
-    private List<EmotionRecord> recordedData = new List<EmotionRecord>();
-    
+
     void Start()
     {
-        // 获取表情识别器
-        emotionRecognizer = GetComponent<MicroExpressionRecognizer>();
-        if (emotionRecognizer == null)
+        // 初始化按钮事件
+        if (recordButton != null)
         {
-            Debug.LogError("EmotionDataRecorder: 未找到MicroExpressionRecognizer组件!");
+            recordButton.onClick.AddListener(ToggleRecording);
+        }
+
+        // 初始化UI文本
+        if (recordTimeText != null)
+        {
+            recordTimeText.text = "00.00s";
+        }
+        if (statusText != null)
+        {
+            statusText.text = "Ready to record";
+            statusText.color = Color.white;
+        }
+
+        // 设置保存路径
+        savePath = Path.Combine(Application.persistentDataPath, "EmotionData");
+        if (!Directory.Exists(savePath))
+        {
+            Directory.CreateDirectory(savePath);
+        }
+
+        // 初始化面部追踪
+        Debug.Log("EmotionDataRecorder: Initializing face tracking...");
+
+        if (!PXR_Plugin.System.UPxr_QueryDeviceAbilities(PxrDeviceAbilities.PxrTrackingModeFaceBit))
+        {
+            Debug.LogError("EmotionDataRecorder: Device does not support face tracking!");
+            if (statusText != null)
+            {
+                statusText.text = "Error: Face tracking not supported";
+                statusText.color = Color.red;
+            }
             return;
         }
-        
-        // 获取blendshape名称列表（从FTTest获取）
-        FTTest ftTest = GetComponent<FTTest>();
-        if (ftTest != null)
-        {
-            // 这里需要从FTTest获取blendShapeNames
-            // 由于blendShapeNames是私有变量，我们需要在FTTest中添加一个公共方法来获取它
-            // 或者我们可以在这里定义一个固定的列表
-            blendShapeNames = GetStandardBlendShapeNames();
-        }
-        
-        // 如果设置了在开始时记录，则开始记录
-        if (recordOnStart)
-        {
-            StartRecording();
-        }
+
+        PXR_MotionTracking.WantFaceTrackingService();
+        FaceTrackingStartInfo info = new FaceTrackingStartInfo();
+        info.mode = FaceTrackingMode.PXR_FTM_FACE_LIPS_BS;
+        PXR_MotionTracking.StartFaceTracking(ref info);
+        Debug.Log("EmotionDataRecorder: Face tracking started with mode: " + info.mode);
     }
-    
+
     void Update()
     {
-        // 如果正在记录
+        // 更新记录状态
         if (isRecording)
         {
-            // 检查是否到了记录时间
-            if (Time.time - lastRecordingTime >= recordingInterval)
+            // 更新计时器
+            recordTimer += Time.deltaTime;
+            sampleTimer += Time.deltaTime;
+
+            // 更新UI显示
+            if (recordTimeText != null)
             {
-                RecordCurrentData();
-                lastRecordingTime = Time.time;
+                recordTimeText.text = recordTimer.ToString("00.00") + "s";
             }
-        }
-    }
-    
-    // 开始记录
-    public void StartRecording()
-    {
-        if (isRecording)
-        {
-            Debug.LogWarning("EmotionDataRecorder: 已经在记录中!");
-            return;
-        }
-        
-        // 创建文件路径
-        string timestamp = includeTimestamp ? DateTime.Now.ToString("yyyyMMdd_HHmmss") : "";
-        filePath = Path.Combine(Application.persistentDataPath, $"{fileName}{timestamp}{fileExtension}");
-        
-        try
-        {
-            // 创建文件和写入器
-            writer = new StreamWriter(filePath);
-            
-            // 写入CSV头部
-            WriteCSVHeader();
-            
-            isRecording = true;
-            lastRecordingTime = Time.time;
-            recordedData.Clear();
-            
-            if (showDebugInfo)
-                Debug.Log($"EmotionDataRecorder: 开始记录数据到 {filePath}");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"EmotionDataRecorder: 无法创建记录文件: {e.Message}");
-        }
-    }
-    
-    // 停止记录
-    public void StopRecording()
-    {
-        if (!isRecording)
-        {
-            Debug.LogWarning("EmotionDataRecorder: 没有在记录中!");
-            return;
-        }
-        
-        isRecording = false;
-        
-        // 关闭写入器
-        if (writer != null)
-        {
-            writer.Close();
-            writer = null;
-        }
-        
-        if (showDebugInfo)
-        {
-            Debug.Log($"EmotionDataRecorder: 停止记录，共记录 {recordedData.Count} 条数据");
-            Debug.Log($"EmotionDataRecorder: 数据已保存到 {filePath}");
-        }
-    }
-    
-    // 记录当前数据
-    private void RecordCurrentData()
-    {
-        // 获取当前情绪
-        EmotionType currentEmotion = emotionRecognizer.GetCurrentEmotion();
-        float confidence = emotionRecognizer.GetCurrentEmotionConfidence();
-        
-        // 获取当前blendshape权重（需要从FTTest获取）
-        float[] currentBlendShapes = GetCurrentBlendShapes();
-        
-        // 创建记录
-        EmotionRecord record = new EmotionRecord
-        {
-            timestamp = Time.time,
-            emotion = currentEmotion,
-            confidence = confidence,
-            blendShapeWeights = currentBlendShapes
-        };
-        
-        // 添加到记录列表
-        recordedData.Add(record);
-        
-        // 写入CSV文件
-        WriteCSVRecord(record);
-    }
-    
-    // 写入CSV头部
-    private void WriteCSVHeader()
-    {
-        List<string> headers = new List<string>();
-        
-        // 添加时间戳
-        headers.Add("Timestamp");
-        
-        // 如果记录情绪
-        if (recordEmotions)
-        {
-            headers.Add("Emotion");
-            headers.Add("Confidence");
-        }
-        
-        // 如果记录blendshape
-        if (recordBlendShapes && blendShapeNames != null)
-        {
-            foreach (string name in blendShapeNames)
+
+            // 采样数据
+            float sampleInterval = 1f / sampleRate;
+            if (sampleTimer >= sampleInterval)
             {
-                headers.Add($"BS_{name}");
+                RecordEmotionData();
+                sampleTimer = 0f;
             }
-        }
-        
-        // 写入头部
-        writer.WriteLine(string.Join(",", headers));
-    }
-    
-    // 写入CSV记录
-    private void WriteCSVRecord(EmotionRecord record)
-    {
-        List<string> values = new List<string>();
-        
-        // 添加时间戳
-        values.Add(record.timestamp.ToString(CultureInfo.InvariantCulture));
-        
-        // 如果记录情绪
-        if (recordEmotions)
-        {
-            values.Add(record.emotion.ToString());
-            values.Add(record.confidence.ToString(CultureInfo.InvariantCulture));
-        }
-        
-        // 如果记录blendshape
-        if (recordBlendShapes && record.blendShapeWeights != null && blendShapeNames != null)
-        {
-            for (int i = 0; i < record.blendShapeWeights.Length && i < blendShapeNames.Count; i++)
+
+            // 检查是否达到记录时长
+            if (recordTimer >= recordDuration)
             {
-                values.Add(record.blendShapeWeights[i].ToString(CultureInfo.InvariantCulture));
-            }
-        }
-        
-        // 写入记录
-        writer.WriteLine(string.Join(",", values));
-    }
-    
-    // 获取当前blendshape权重
-    private float[] GetCurrentBlendShapes()
-    {
-        // 从FTTest获取当前blendshape权重
-        FTTest ftTest = GetComponent<FTTest>();
-        if (ftTest != null)
-        {
-            // 使用FTTest中新增的公共方法获取blendshape权重
-            return ftTest.GetCurrentBlendShapeWeights();
-        }
-        
-        return new float[72]; // 如果无法获取，返回空数组
-    }
-    
-    // 获取标准blendshape名称列表
-    private List<string> GetStandardBlendShapeNames()
-    {
-        return new List<string>
-        {
-            "eyeLookDownLeft",
-            "noseSneerLeft",
-            "eyeLookInLeft",
-            "browInnerUp",
-            "browDownRight",
-            "mouthClose",
-            "mouthLowerDownRight",
-            "jawOpen",
-            "mouthUpperUpRight",
-            "mouthShrugUpper",
-            "mouthFunnel",
-            "eyeLookInRight",
-            "eyeLookDownRight",
-            "noseSneerRight",
-            "mouthRollUpper",
-            "jawRight",
-            "browDownLeft",
-            "mouthShrugLower",
-            "mouthRollLower",
-            "mouthSmileLeft",
-            "mouthPressLeft",
-            "mouthSmileRight",
-            "mouthPressRight",
-            "mouthDimpleRight",
-            "mouthLeft",
-            "jawForward",
-            "eyeSquintLeft",
-            "mouthFrownLeft",
-            "eyeBlinkLeft",
-            "cheekSquintLeft",
-            "browOuterUpLeft",
-            "eyeLookUpLeft",
-            "jawLeft",
-            "mouthStretchLeft",
-            "mouthPucker",
-            "eyeLookUpRight",
-            "browOuterUpRight",
-            "cheekSquintRight",
-            "eyeBlinkRight",
-            "mouthUpperUpLeft",
-            "mouthFrownRight",
-            "eyeSquintRight",
-            "mouthStretchRight",
-            "cheekPuff",
-            "eyeLookOutLeft",
-            "eyeLookOutRight",
-            "eyeWideRight",
-            "eyeWideLeft",
-            "mouthRight",
-            "mouthDimpleLeft",
-            "mouthLowerDownLeft",
-            "tongueOut",
-            "viseme_PP",
-            "viseme_CH",
-            "viseme_o",
-            "viseme_O",
-            "viseme_i",
-            "viseme_I",
-            "viseme_RR",
-            "viseme_XX",
-            "viseme_aa",
-            "viseme_FF",
-            "viseme_u",
-            "viseme_U",
-            "viseme_TH",
-            "viseme_kk",
-            "viseme_SS",
-            "viseme_e",
-            "viseme_DD",
-            "viseme_E",
-            "viseme_nn",
-            "viseme_sil",
-        };
-    }
-    
-    // 获取记录数据
-    public List<EmotionRecord> GetRecordedData()
-    {
-        return recordedData;
-    }
-    
-    // 清除记录数据
-    public void ClearRecordedData()
-    {
-        recordedData.Clear();
-    }
-    
-    // 分析情绪数据
-    public Dictionary<EmotionType, float> AnalyzeEmotionData()
-    {
-        Dictionary<EmotionType, float> emotionFrequency = new Dictionary<EmotionType, float>();
-        
-        // 初始化所有情绪的频率
-        emotionFrequency[EmotionType.Neutral] = 0f;
-        emotionFrequency[EmotionType.Happy] = 0f;
-        emotionFrequency[EmotionType.Sad] = 0f;
-        emotionFrequency[EmotionType.Angry] = 0f;
-        emotionFrequency[EmotionType.Surprised] = 0f;
-        emotionFrequency[EmotionType.Fear] = 0f;
-        emotionFrequency[EmotionType.Disgusted] = 0f;
-        emotionFrequency[EmotionType.Confused] = 0f;
-        
-        // 计算每种情绪的频率
-        foreach (EmotionRecord record in recordedData)
-        {
-            emotionFrequency[record.emotion] += 1f;
-        }
-        
-        // 计算百分比
-        int totalRecords = recordedData.Count;
-        if (totalRecords > 0)
-        {
-            foreach (EmotionType emotion in emotionFrequency.Keys.ToList())
-            {
-                emotionFrequency[emotion] = (emotionFrequency[emotion] / totalRecords) * 100f;
-            }
-        }
-        
-        return emotionFrequency;
-    }
-    
-    // 显示调试信息
-    private void OnGUI()
-    {
-        if (!showDebugInfo) return;
-        
-        GUILayout.BeginArea(new Rect(320, 10, 300, 200));
-        GUILayout.BeginVertical("box");
-        
-        GUILayout.Label($"记录状态: {(isRecording ? "记录中" : "已停止")}");
-        GUILayout.Label($"记录条数: {recordedData.Count}");
-        GUILayout.Label($"记录间隔: {recordingInterval}秒");
-        
-        if (GUILayout.Button(isRecording ? "停止记录" : "开始记录"))
-        {
-            if (isRecording)
                 StopRecording();
-            else
-                StartRecording();
+            }
         }
-        
-        if (GUILayout.Button("清除数据"))
-        {
-            ClearRecordedData();
-        }
-        
-        GUILayout.EndVertical();
-        GUILayout.EndArea();
     }
-    
-    // 在应用程序退出时停止记录
-    void OnDestroy()
+
+    /// <summary>
+    /// 切换记录状态（开始/停止）
+    /// </summary>
+    public void ToggleRecording()
     {
         if (isRecording)
         {
             StopRecording();
         }
+        else
+        {
+            StartRecording();
+        }
+    }
+
+    /// <summary>
+    /// 开始记录
+    /// </summary>
+    public void StartRecording()
+    {
+        recordedData.Clear();
+        recordTimer = 0f;
+        sampleTimer = 0f;
+        isRecording = true;
+
+        // 更新UI
+        if (recordButton != null)
+        {
+            var buttonText = recordButton.GetComponentInChildren<TMP_Text>();
+            if (buttonText != null)
+            {
+                buttonText.text = "停止记录";
+            }
+            recordButton.image.color = Color.red;
+        }
+        if (statusText != null)
+        {
+            statusText.text = $"Recording: {emotionLabel} ({recordDuration}s)";
+            statusText.color = Color.green;
+        }
+        if (recordTimeText != null)
+        {
+            recordTimeText.text = "00.00s";
+        }
+
+        Debug.Log($"EmotionDataRecorder: Started recording emotion: {emotionLabel}");
+    }
+
+    /// <summary>
+    /// 停止记录并保存数据
+    /// </summary>
+    public void StopRecording()
+    {
+        isRecording = false;
+
+        // 更新UI
+        if (recordButton != null)
+        {
+            var buttonText = recordButton.GetComponentInChildren<TMP_Text>();
+            if (buttonText != null)
+            {
+                buttonText.text = "开始记录";
+            }
+            recordButton.image.color = Color.white;
+        }
+        if (statusText != null)
+        {
+            statusText.text = $"Saved {recordedData.Count} samples";
+            statusText.color = Color.yellow;
+        }
+
+        // 保存数据
+        if (recordedData.Count > 0)
+        {
+            SaveRecordedData();
+        }
+
+        Debug.Log($"EmotionDataRecorder: Stopped recording. Total samples: {recordedData.Count}");
+    }
+
+    /// <summary>
+    /// 记录当前帧的表情数据
+    /// </summary>
+    private void RecordEmotionData()
+    {
+        // 获取面部追踪数据
+        PXR_System.GetFaceTrackingData(0, GetDataType.PXR_GET_FACELIP_DATA, ref faceTrackingInfo);
+
+        // 创建新的数据记录
+        EmotionData data = new EmotionData();
+        data.timestamp = recordTimer;
+
+        // 复制blendShape权重（使用unsafe指针）
+        unsafe
+        {
+            fixed (float* source = faceTrackingInfo.blendShapeWeight)
+            {
+                for (int i = 0; i < 72; i++)
+                {
+                    data.blendShapeWeights[i] = source[i];
+                }
+            }
+        }
+
+        // 添加到记录列表
+        recordedData.Add(data);
+    }
+
+    /// <summary>
+    /// 保存记录的数据到CSV文件
+    /// </summary>
+    private void SaveRecordedData()
+    {
+        // 生成文件名：emotion_标签_时间戳.csv
+        string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        string fileName = $"emotion_{emotionLabel}_{timestamp}.csv";
+        string filePath = Path.Combine(savePath, fileName);
+
+        // 写入CSV文件
+        using (StreamWriter writer = new StreamWriter(filePath))
+        {
+            // 写入表头
+            writer.Write("timestamp");
+            for (int i = 0; i < 72; i++)
+            {
+                writer.Write($",blendshape_{i}");
+            }
+            writer.WriteLine();
+
+            // 写入数据
+            foreach (EmotionData data in recordedData)
+            {
+                writer.Write(data.timestamp.ToString("0.000"));
+                for (int i = 0; i < 72; i++)
+                {
+                    writer.Write($",{data.blendShapeWeights[i]:F4}");
+                }
+                writer.WriteLine();
+            }
+        }
+
+        Debug.Log($"EmotionDataRecorder: Data saved to {filePath}");
+
+        // 也可以保存为JSON格式，方便后续加载
+        string jsonFileName = $"emotion_{emotionLabel}_{timestamp}.json";
+        string jsonFilePath = Path.Combine(savePath, jsonFileName);
+        string jsonData = JsonUtility.ToJson(new EmotionDataContainer
+        {
+            emotionLabel = emotionLabel,
+            recordDuration = recordDuration,
+            sampleRate = sampleRate,
+            sampleCount = recordedData.Count,
+            data = recordedData
+        }, true);
+        File.WriteAllText(jsonFilePath, jsonData);
+        Debug.Log($"EmotionDataRecorder: JSON data saved to {jsonFilePath}");
+    }
+
+    /// <summary>
+    /// 设置表情标签（用于标记当前记录的表情类型）
+    /// </summary>
+    public void SetEmotionLabel(string label)
+    {
+        emotionLabel = label;
+        Debug.Log($"EmotionDataRecorder: Emotion label set to: {label}");
+    }
+
+    /// <summary>
+    /// 获取数据保存路径
+    /// </summary>
+    public string GetSavePath()
+    {
+        return savePath;
+    }
+
+    void OnDisable()
+    {
+        // 如果正在记录，停止并保存
+        if (isRecording)
+        {
+            StopRecording();
+        }
+    }
+
+    // 用于JSON序列化的容器类
+    [System.Serializable]
+    private class EmotionDataContainer
+    {
+        public string emotionLabel;
+        public float recordDuration;
+        public int sampleRate;
+        public int sampleCount;
+        public List<EmotionData> data;
     }
 }
