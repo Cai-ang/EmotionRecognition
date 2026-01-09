@@ -54,27 +54,6 @@ def load_data(file_path, label):
     
     return features
 
-def preprocess_data(anger_df, happy_df, remove_visemes=True):
-    """
-    数据预处理：合并数据，去除Viseme特征（如果需要），准备训练集
-    """
-    # 合并数据
-    all_data = pd.concat([anger_df, happy_df], axis=0).reset_index(drop=True)
-    
-    # 提取特征和标签
-    X = all_data.drop('label', axis=1)
-    y = all_data['label']
-    
-    # 去除Viseme特征（最后15个）- 如果需要
-    if remove_visemes:
-        viseme_columns = [col for col in X.columns if col.startswith('viseme_')]
-        X = X.drop(viseme_columns, axis=1)
-        print(f"去除Viseme特征后剩余特征数: {X.shape[1]}")
-    else:
-        print(f"保留所有特征数: {X.shape[1]}")
-    
-    return X, y
-
 def train_and_evaluate(X, y, test_size=0.3, random_state=42):
     """
     训练并评估多个分类模型
@@ -94,8 +73,13 @@ def train_and_evaluate(X, y, test_size=0.3, random_state=42):
     print(f"  - 总样本数: {len(y)}")
     print(f"  - 训练集: {len(y_train)} 样本")
     print(f"  - 测试集: {len(y_test)} 样本")
-    print(f"  - anger样本: {sum(y == 'anger')}")
-    print(f"  - happy样本: {sum(y == 'happy')}")
+
+    # 显示各类别样本数
+    unique_labels = sorted(list(set(y)))
+    for label in unique_labels:
+        count = sum(y == label)
+        print(f"  - {label}: {count} 样本")
+
     print("="*60 + "\n")
     
     # 定义多个模型进行对比
@@ -178,10 +162,13 @@ def plot_results(results, y_test):
     # 2. 混淆矩阵（使用最佳模型）
     best_model_name = max(results.keys(), key=lambda k: results[k]['accuracy'])
     cm = results[best_model_name]['confusion_matrix']
-    
+
+    # 获取所有唯一的类别标签
+    unique_classes = sorted(list(set(y_test)))
+
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[1],
-                xticklabels=['anger', 'happy'],
-                yticklabels=['anger', 'happy'])
+                xticklabels=unique_classes,
+                yticklabels=unique_classes)
     axes[1].set_xlabel('预测标签', fontsize=12)
     axes[1].set_ylabel('真实标签', fontsize=12)
     axes[1].set_title(f'混淆矩阵 - {best_model_name}', fontsize=14, fontweight='bold')
@@ -696,57 +683,174 @@ def main():
     # 创建输出目录
     output_dir = "onnx_models"
     os.makedirs(output_dir, exist_ok=True)
-    
-    # 数据文件路径
-    anger_path = "EmotionData/anger.csv"
-    happy_path = "EmotionData/happy.csv"
-    
-    # 检查文件是否存在
-    if not os.path.exists(anger_path):
-        print(f"错误: 找不到文件 {anger_path}")
-        return
-    if not os.path.exists(happy_path):
-        print(f"错误: 找不到文件 {happy_path}")
-        return
-    
+
+    # 数据目录
+    emotion_data_dir = "EmotionData"
+
     print("="*60)
-    print("表情识别分类测试 & ONNX导出")
+    print("多类别表情识别 & ONNX导出（支持多人数据）")
     print("="*60)
-    
-    # 加载数据
-    print("\n加载数据...")
-    anger_df = load_data(anger_path, 'anger')
-    happy_df = load_data(happy_path, 'happy')
-    
-    print(f"anger数据: {anger_df.shape[0]} 样本")
-    print(f"happy数据: {happy_df.shape[0]} 样本")
-    
-    # 数据预处理
-    X, y = preprocess_data(anger_df, happy_df, remove_visemes=True)
-    
+
+    # 自动检测人物文件夹
+    person_dirs = []
+    if os.path.isdir(emotion_data_dir):
+        # 查找所有子文件夹（ca/, lcs/等）
+        for item in os.listdir(emotion_data_dir):
+            item_path = os.path.join(emotion_data_dir, item)
+            if os.path.isdir(item_path):
+                person_dirs.append(item)
+                print(f"发现人物文件夹: {item}")
+
+    if len(person_dirs) == 0:
+        print("警告: 未发现人物文件夹，尝试直接在EmotionData/中查找CSV文件")
+        # 没有子文件夹，直接查找CSV
+        emotion_files = {
+            'anger': 'EmotionData/anger.csv',
+            'disgust': 'EmotionData/disgust.csv',
+            'fear': 'EmotionData/fear.csv',
+            'happy': 'EmotionData/happy.csv',
+            'neutral': 'EmotionData/neutral.csv',
+            'sad': 'EmotionData/sad.csv',
+            'surprise': 'EmotionData/surprise.csv'
+        }
+
+        data_frames = []
+        for emotion, file_path in emotion_files.items():
+            if os.path.exists(file_path):
+                df = load_data(file_path, emotion)
+                data_frames.append(df)
+                print(f"  {emotion}: {df.shape[0]} 样本")
+    else:
+        # 有子文件夹，加载所有人物的数据
+        print(f"共发现 {len(person_dirs)} 个人物")
+        data_frames = []
+
+        emotions = ['anger', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
+
+        for person_id in person_dirs:
+            person_path = os.path.join(emotion_data_dir, person_id)
+            print(f"\n加载 {person_id} 的数据...")
+
+            person_data_count = 0
+            for emotion in emotions:
+                # 尝试不同的文件名格式：emotion_personid.csv 或 emotion.csv
+                possible_files = [
+                    os.path.join(person_path, f"{emotion}_{person_id}.csv"),
+                    os.path.join(person_path, f"{emotion}.csv")
+                ]
+
+                file_found = False
+                for file_path in possible_files:
+                    if os.path.exists(file_path):
+                        df = load_data(file_path, emotion)
+                        data_frames.append(df)
+                        person_data_count += df.shape[0]
+                        file_found = True
+                        break
+
+                if file_found:
+                    print(f"  {emotion}: {df.shape[0]} 样本")
+                else:
+                    print(f"  ⚠️  {emotion}: 文件未找到")
+
+            print(f"  {person_id} 总计: {person_data_count} 样本")
+
+    # 合并所有数据
+    if len(data_frames) > 0:
+        all_data = pd.concat(data_frames, axis=0).reset_index(drop=True)
+        print(f"\n✓ 总数据量: {all_data.shape[0]} 样本")
+        print(f"✓ 情绪类别: 7 种")
+    else:
+        print("\n错误: 未加载到任何数据!")
+        return
+
+    # 数据分布分析
+    print("\n" + "="*60)
+    print("数据分布分析")
+    print("="*60)
+
+    # 按情绪统计
+    emotion_counts = all_data['label'].value_counts().sort_values(ascending=False)
+    print("\n按情绪统计:")
+    total_samples = len(all_data)
+    for emotion in emotion_counts.index:
+        count = emotion_counts[emotion]
+        percentage = count / total_samples * 100
+        print(f"  {emotion}: {count} 样本 ({percentage:.1f}%)")
+
+    # 如果有多人数据，显示按人物统计
+    if len(person_dirs) > 0:
+        print("\n按人物统计:")
+        for person_id in person_dirs:
+            person_mask = all_data.apply(lambda row: person_id in str(row.name), axis=1) if 'person_id' in locals() else False
+            # 简单方法：计算每个人物的大约比例
+            person_percentage = 1.0 / len(person_dirs) * 100
+            print(f"  {person_id}: 约 {total_samples // len(person_dirs)} 样本 ({person_percentage:.1f}%)")
+
+    # 绘制数据分布图
+    print("\n生成数据分布图...")
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # 1. 按情绪的样本数
+    colors = ['#ff6b6b', '#8b4513', '#2c3e50', '#f1c40f', '#27ae60', '#16a085', '#d4ac0d']
+    axes[0].bar(emotion_counts.index, emotion_counts.values, color=colors)
+    axes[0].set_xlabel('情绪', fontsize=11)
+    axes[0].set_ylabel('样本数', fontsize=11)
+    axes[0].set_title('按情绪的数据分布', fontsize=12, fontweight='bold')
+    axes[0].grid(axis='y', alpha=0.3)
+
+    # 在柱状图上添加数值
+    for i, (emotion, count) in enumerate(zip(emotion_counts.index, emotion_counts.values)):
+        percentage = count / total_samples * 100
+        axes[0].text(i, count, f'\n{percentage:.1f}%', ha='center', va='bottom', fontsize=9)
+
+    # 2. 数据平衡性饼图
+    axes[1].pie(emotion_counts.values, labels=emotion_counts.index, autopct='%1.1f%%',
+                         colors=colors, startangle=90)
+    axes[1].set_title('数据平衡性', fontsize=12, fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig('data_distribution.png', dpi=300, bbox_inches='tight')
+    print("✓ 数据分布图已保存: data_distribution.png")
+    plt.close()
+
+    # 提取特征和标签
+    X = all_data.drop('label', axis=1)
+    y = all_data['label']
+
+    # 去除Viseme特征（最后15个）
+    viseme_columns = [col for col in X.columns if col.startswith('viseme_')]
+    X = X.drop(viseme_columns, axis=1)
+    print(f"去除Viseme特征后剩余特征数: {X.shape[1]}")
+
     # 创建标签编码器
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
-    
+    print(f"类别编码: {dict(zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_)))}")
+
     # 划分训练集和测试集
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=42, stratify=y
     )
-    
+
     # 特征标准化
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
-    
+
     print("\n" + "="*60)
     print(f"数据集信息:")
     print(f"  - 总样本数: {len(y)}")
     print(f"  - 训练集: {len(y_train)} 样本")
     print(f"  - 测试集: {len(y_test)} 样本")
-    print(f"  - anger样本: {sum(y == 'anger')}")
-    print(f"  - happy样本: {sum(y == 'happy')}")
+
+    for emotion in label_encoder.classes_:
+        count = sum(y == emotion)
+        percentage = count / len(y) * 100
+        print(f"  - {emotion}: {count} 样本 ({percentage:.1f}%)")
+
     print("="*60 + "\n")
-    
+
     # 训练和评估传统机器学习模型
     results, _, _, _, _, _ = train_and_evaluate(X, y)
 
@@ -756,7 +860,7 @@ def main():
     print("="*60)
     nn_model, history, nn_accuracy, y_pred_nn, cm_nn = train_neural_network(
         X_train_scaled, y_train, X_test_scaled, y_test, label_encoder,
-        epochs=100, batch_size=32
+        epochs=150, batch_size=32  # 增加epoch以适应更多类别
     )
 
     # 可视化结果
