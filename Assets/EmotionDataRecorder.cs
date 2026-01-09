@@ -21,6 +21,83 @@ public class EmotionDataRecorder : MonoBehaviour
     private PxrFaceTrackingInfo faceTrackingInfo;
     private float[] blendShapeWeight = new float[72];
 
+    // ARKit标准blendShape名称列表（共72个）
+    private string[] blendShapeNames = new string[]
+    {
+        "eyeLookDownLeft",
+        "noseSneerLeft",
+        "eyeLookInLeft",
+        "browInnerUp",
+        "browDownRight",
+        "mouthClose",
+        "mouthLowerDownRight",
+        "jawOpen",
+        "mouthUpperUpRight",
+        "mouthShrugUpper",
+        "mouthFunnel",
+        "eyeLookInRight",
+        "eyeLookDownRight",
+        "noseSneerRight",
+        "mouthRollUpper",
+        "jawRight",
+        "browDownLeft",
+        "mouthShrugLower",
+        "mouthRollLower",
+        "mouthSmileLeft",
+        "mouthPressLeft",
+        "mouthSmileRight",
+        "mouthPressRight",
+        "mouthDimpleRight",
+        "mouthLeft",
+        "jawForward",
+        "eyeSquintLeft",
+        "mouthFrownLeft",
+        "eyeBlinkLeft",
+        "cheekSquintLeft",
+        "browOuterUpLeft",
+        "eyeLookUpLeft",
+        "jawLeft",
+        "mouthStretchLeft",
+        "mouthPucker",
+        "eyeLookUpRight",
+        "browOuterUpRight",
+        "cheekSquintRight",
+        "eyeBlinkRight",
+        "mouthUpperUpLeft",
+        "mouthFrownRight",
+        "eyeSquintRight",
+        "mouthStretchRight",
+        "cheekPuff",
+        "eyeLookOutLeft",
+        "eyeLookOutRight",
+        "eyeWideRight",
+        "eyeWideLeft",
+        "mouthRight",
+        "mouthDimpleLeft",
+        "mouthLowerDownLeft",
+        "tongueOut",
+        "viseme_PP",
+        "viseme_CH",
+        "viseme_o",
+        "viseme_O",
+        "viseme_i",
+        "viseme_I",
+        "viseme_RR",
+        "viseme_XX",
+        "viseme_aa",
+        "viseme_FF",
+        "viseme_u",
+        "viseme_U",
+        "viseme_TH",
+        "viseme_kk",
+        "viseme_SS",
+        "viseme_e",
+        "viseme_DD",
+        "viseme_E",
+        "viseme_nn",
+        "viseme_sil"
+    };
+
     // 记录状态
     private bool isRecording = false;
     private float recordTimer = 0f;
@@ -236,11 +313,11 @@ public class EmotionDataRecorder : MonoBehaviour
         // 写入CSV文件
         using (StreamWriter writer = new StreamWriter(filePath))
         {
-            // 写入表头
+            // 写入表头（使用ARKit标准blendShape名称）
             writer.Write("timestamp");
             for (int i = 0; i < 72; i++)
             {
-                writer.Write($",blendshape_{i}");
+                writer.Write($",{blendShapeNames[i]}");
             }
             writer.WriteLine();
 
@@ -267,6 +344,7 @@ public class EmotionDataRecorder : MonoBehaviour
             recordDuration = recordDuration,
             sampleRate = sampleRate,
             sampleCount = recordedData.Count,
+            blendShapeNames = blendShapeNames,
             data = recordedData
         }, true);
         File.WriteAllText(jsonFilePath, jsonData);
@@ -307,6 +385,7 @@ public class EmotionDataRecorder : MonoBehaviour
         public float recordDuration;
         public int sampleRate;
         public int sampleCount;
+        public string[] blendShapeNames;
         public List<EmotionData> data;
     }
 }

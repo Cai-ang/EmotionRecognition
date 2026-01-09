@@ -14,6 +14,8 @@ public class FTTest : MonoBehaviour
     public GameObject text;
     public Transform TextParent;
 
+    // 表情识别相关
+    public EmotionRecognizer emotionRecognizer;
     private List<TMP_Text> texts = new List<TMP_Text>();
 
     private float[] blendShapeWeight = new float[72];
@@ -145,6 +147,17 @@ public class FTTest : MonoBehaviour
         rightLookInIndex = rightEyeExample.sharedMesh.GetBlendShapeIndex("eyeLookInRight");
         rightLookOutIndex = rightEyeExample.sharedMesh.GetBlendShapeIndex("eyeLookOutRight");
 
+        // 初始化表情识别器
+        if (emotionRecognizer != null)
+        {
+            Debug.Log("FTTest: Initializing EmotionRecognizer...");
+            emotionRecognizer.InitializeModel();
+        }
+        else
+        {
+            Debug.LogWarning("FTTest: EmotionRecognizer is not assigned in Inspector!");
+        }
+
     }
 
     // Update is called once per frame
@@ -200,7 +213,36 @@ public class FTTest : MonoBehaviour
             rightEyeExample.SetBlendShapeWeight(rightLookDownIndex, 100 * blendShapeWeight[12]);
             rightEyeExample.SetBlendShapeWeight(rightLookInIndex, 100 * blendShapeWeight[11]);
             rightEyeExample.SetBlendShapeWeight(rightLookOutIndex, 100 * blendShapeWeight[45]);
-            
+
+            // 表情识别预测
+            if (emotionRecognizer != null)
+            {
+                try
+                {
+                    // 调用预测函数，传入72个blendShape权重
+                    string predictedEmotion = emotionRecognizer.PredictEmotion(blendShapeWeight);
+
+                    // 每60帧打印一次预测结果，避免日志过多
+                    if (Time.frameCount % 60 == 0)
+                    {
+                        Debug.Log($"FTTest: Predicted emotion: {predictedEmotion}");
+                    }
+                }
+                catch (System.Exception e)
+                {
+                    if (Time.frameCount % 60 == 0)
+                    {
+                        Debug.LogError($"FTTest: Emotion prediction failed - {e.Message}");
+                    }
+                }
+            }
+            else
+            {
+                if (Time.frameCount % 60 == 0)
+                {
+                    Debug.LogWarning("FTTest: EmotionRecognizer not assigned!");
+                }
+            }
         }
         else
         {
