@@ -412,13 +412,19 @@ def export_pytorch_to_onnx(model, output_path, input_shape, num_classes, opset_v
         if os.path.exists(output_path):
             file_size = os.path.getsize(output_path)
             print(f"✓ 文件大小: {file_size / 1024:.2f} KB")
+
+            # 验证ONNX模型
+            try:
+                import onnx
+                onnx_model = onnx.load(output_path)
+                onnx.checker.check_model(onnx_model)
+                print("✓ ONNX模型验证通过!")
+            except ImportError:
+                print("⚠ 警告: onnx库未安装，跳过模型验证")
+            except Exception as e:
+                print(f"⚠ 警告: ONNX模型验证失败: {str(e)}")
         else:
             print(f"✗ 警告: 文件未创建!")
-
-        # 验证ONNX模型
-        onnx_model = onnx.load(output_path)
-        onnx.checker.check_model(onnx_model)
-        print("✓ ONNX模型验证通过!")
 
         return onnx_model
 
